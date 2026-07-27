@@ -1,14 +1,20 @@
 /*
  * FullFunction.ino
- * FULL FUNCTIONALITY EXAMPLE FOR BD37033 LIBRARY
+ * FULL FUNCTIONALITY DEMO FOR BD37033 LIBRARY
  * 
- * This example demonstrates ALL functions of the BD37033 library.
- * Use it as a reference to understand how to use each feature.
+ * This example demonstrates ALL functions of the BD37033 library with
+ * audible changes so you can hear the effect of each parameter.
  * 
- * Wiring:
- *   BD37033 SDA → Arduino/ESP32 SDA (A4 / GPIO21)
- *   BD37033 SCL → Arduino/ESP32 SCL (A5 / GPIO22)
- *   BD37033 VDD → 3.3V or 5V
+ * Wiring (ESP32):
+ *   BD37033 SDA → GPIO27
+ *   BD37033 SCL → GPIO22
+ *   BD37033 VDD → 3.3V
+ *   BD37033 GND → GND
+ * 
+ * Wiring (Arduino Uno/Nano):
+ *   BD37033 SDA → A4
+ *   BD37033 SCL → A5
+ *   BD37033 VDD → 5V
  *   BD37033 GND → GND
  * 
  * Author: Kirill Primus
@@ -16,14 +22,21 @@
  */
 
 #include <BD37033.h>
+#include <Wire.h>
+
+// ==================================================
+// I2C PINS (ESP32 default)
+// ==================================================
+#define I2C_SDA 27
+#define I2C_SCL 22
 
 // ==================================================
 // GLOBAL VARIABLES
 // ==================================================
 
-// For demo purposes
-int currentStep = 0;
-unsigned long lastStepTime = 0;
+int demoStep = 0;
+bool demoRunning = true;
+const int DEFAULT_VOLUME_DB = -30;  // -30 dB = comfortable listening level
 
 // ==================================================
 // SETUP
@@ -34,33 +47,41 @@ void setup() {
     delay(1000);
 
     Serial.println("\n==========================================");
-    Serial.println("  BD37033 FULL FUNCTION EXAMPLE");
+    Serial.println("  BD37033 FULL FUNCTION DEMO");
+    Serial.println("  Hear the changes as they happen!");
+    Serial.println("  All values are in dB (decibels)");
     Serial.println("==========================================\n");
 
-    // ---- 1. INITIALIZATION ----
-    Serial.println("[1] INITIALIZATION");
-    if (BD37033_init()) {
-        Serial.println("    ✅ BD37033 found!");
-    } else {
+    // ---- I2C INIT ----
+    Serial.println("[I2C] Initializing...");
+    Wire.begin(I2C_SDA, I2C_SCL);
+    Wire.setClock(100000);
+    Serial.printf("      SDA=GPIO%d, SCL=GPIO%d\n", I2C_SDA, I2C_SCL);
+
+    // ---- BD37033 INIT ----
+    Serial.println("[BD37033] Initializing...");
+    if (!BD37033_init()) {
         Serial.println("    ❌ BD37033 NOT found!");
-        Serial.println("       Check wiring and power.");
-        while (1) {
-            delay(1000);
-        }
+        Serial.println("    Check wiring: SDA→GPIO27, SCL→GPIO22, VDD→3.3V, GND→GND");
+        while (1) delay(1000);
     }
+    Serial.println("    ✅ BD37033 found!");
 
-    // ---- 2. FULL RESET ----
-    Serial.println("\n[2] FULL RESET");
+    // ---- STARTUP SETTINGS ----
+    Serial.println("\n[SETUP] Applying startup settings...");
     BD37033_fullReset();
-    Serial.println("    ✅ All registers reset to default");
+    BD37033_setInput(BD37033_INPUT_A);
+    BD37033_setVolume(DEFAULT_VOLUME_DB);  // -30 dB
+    BD37033_setMute(false);
+    Serial.printf("    ✅ Input: A, Volume: %d dB, Mute: OFF\n", DEFAULT_VOLUME_DB);
+    Serial.println("    🔊 Sound should be audible now.\n");
 
-    // ---- 3. DEMONSTRATE ALL FUNCTIONS ----
-    Serial.println("\n[3] DEMONSTRATING ALL FUNCTIONS");
-    demonstrateAllFunctions();
-
-    Serial.println("\n==========================================");
-    Serial.println("  ✅ Setup complete! Starting demo loop...");
+    Serial.println("==========================================");
+    Serial.println("  Starting demo in 3 seconds...");
+    Serial.println("  Each step will show changes in Serial");
+    Serial.println("  and you will hear the difference!");
     Serial.println("==========================================\n");
+    delay(3000);
 }
 
 // ==================================================
@@ -68,304 +89,280 @@ void setup() {
 // ==================================================
 
 void loop() {
-    // Run a simple demo cycling through different settings
-    runDemoCycle();
-    
-    delay(2000);  // Wait 2 seconds between steps
-}
+    if (!demoRunning) return;
 
-// ==================================================
-// DEMONSTRATE ALL FUNCTIONS
-// ==================================================
-
-void demonstrateAllFunctions() {
-    // ---- VOLUME ----
-    Serial.println("    --- VOLUME ---");
-    BD37033_setVolume(30);   // -49 dB
-    Serial.println("    Volume set to 30 (-49 dB)");
-    
-    delay(500);
-
-    // ---- INPUT SELECTION ----
-    Serial.println("    --- INPUT SELECTION ---");
-    BD37033_setInput(BD37033_INPUT_A);
-    Serial.println("    Input: A");
-    BD37033_setInput(BD37033_INPUT_B);
-    Serial.println("    Input: B");
-    BD37033_setInput(BD37033_INPUT_C);
-    Serial.println("    Input: C");
-    BD37033_setInput(BD37033_INPUT_D);
-    Serial.println("    Input: D");
-    BD37033_setInput(BD37033_INPUT_E);
-    Serial.println("    Input: E");
-    
-    delay(500);
-
-    // ---- TONE CONTROLS ----
-    Serial.println("    --- TONE CONTROLS ---");
-    BD37033_setBass(5);
-    Serial.println("    Bass: +5 dB");
-    BD37033_setMiddle(0);
-    Serial.println("    Middle: 0 dB");
-    BD37033_setTreble(-3);
-    Serial.println("    Treble: -3 dB");
-    
-    delay(500);
-
-    // ---- ADVANCED TONE SETTINGS ----
-    Serial.println("    --- ADVANCED TONE SETTINGS ---");
-    BD37033_setBassF0(BD37033_BASS_80HZ);
-    Serial.println("    Bass F0: 80 Hz");
-    BD37033_setBassQ(BD37033_BASS_Q_1_5);
-    Serial.println("    Bass Q: 1.5");
-    
-    BD37033_setMidF0(BD37033_MID_1KHZ);
-    Serial.println("    Mid F0: 1 kHz");
-    BD37033_setMidQ(BD37033_MID_Q_1_0);
-    Serial.println("    Mid Q: 1.0");
-    
-    BD37033_setTrebleF0(BD37033_TREBLE_10KHZ);
-    Serial.println("    Treble F0: 10 kHz");
-    BD37033_setTrebleQ(BD37033_TREBLE_Q_0_75);
-    Serial.println("    Treble Q: 0.75");
-    
-    delay(500);
-
-    // ---- BALANCE ----
-    Serial.println("    --- BALANCE ---");
-    BD37033_setBalance(0);
-    Serial.println("    Balance: 0 (center)");
-    BD37033_setBalance(-5);
-    Serial.println("    Balance: -5 (left louder)");
-    BD37033_setBalance(5);
-    Serial.println("    Balance: +5 (right louder)");
-    BD37033_setBalance(0);
-    Serial.println("    Balance: 0 (center)");
-    
-    delay(500);
-
-    // ---- FADER ----
-    Serial.println("    --- FADER ---");
-    BD37033_setFader(0);
-    Serial.println("    Fader: 0 (center)");
-    BD37033_setFader(-50);
-    Serial.println("    Fader: -50 (rear quieter)");
-    BD37033_setFader(50);
-    Serial.println("    Fader: +50 (front quieter)");
-    BD37033_setFader(0);
-    Serial.println("    Fader: 0 (center)");
-    
-    delay(500);
-
-    // ---- LOUDNESS ----
-    Serial.println("    --- LOUDNESS ---");
-    BD37033_setLoudness(true);
-    Serial.println("    Loudness: ON");
-    BD37033_setLoudnessGain(10);
-    Serial.println("    Loudness Gain: 10 dB");
-    BD37033_setLoudnessHiCut(BD37033_HICUT_2_4KHZ);
-    Serial.println("    Loudness HiCut: 2.4 kHz");
-    
-    delay(500);
-
-    // ---- INPUT GAIN ----
-    Serial.println("    --- INPUT GAIN ---");
-    BD37033_setInputGain(0);
-    Serial.println("    Input Gain: 0 dB");
-    BD37033_setInputGain(8);
-    Serial.println("    Input Gain: 8 dB");
-    BD37033_setInputGain(0);
-    Serial.println("    Input Gain: 0 dB");
-    
-    delay(500);
-
-    // ---- INPUT TYPE ----
-    Serial.println("    --- INPUT TYPE ---");
-    BD37033_setInputType(false, BD37033_INPUT_A);  // Single-ended
-    Serial.println("    Input A: Single-ended");
-    BD37033_setInputType(true, BD37033_INPUT_B);   // Differential
-    Serial.println("    Input B: Differential");
-    BD37033_setInputType(false, BD37033_INPUT_C);
-    Serial.println("    Input C: Single-ended");
-    
-    delay(500);
-
-    // ---- SUBWOOFER ----
-    Serial.println("    --- SUBWOOFER ---");
-    BD37033_setSubLPF(BD37033_SUB_85HZ);
-    Serial.println("    Sub LPF: 85 Hz");
-    BD37033_setSubPhase(BD37033_SUB_PHASE_0);
-    Serial.println("    Sub Phase: 0°");
-    BD37033_setSubInput(0);
-    Serial.println("    Sub Input: Fader");
-    BD37033_setSubOutput(0);
-    Serial.println("    Sub Output: OUTS");
-    
-    delay(500);
-
-    // ---- MIXER ----
-    Serial.println("    --- MIXER ---");
-    BD37033_setMixingGain(0);
-    Serial.println("    Mixing Gain: 0 dB");
-    BD37033_setMixingInput(BD37033_INPUT_A);
-    Serial.println("    Mixing Input: A");
-    
-    delay(500);
-
-    // ---- MUTE ----
-    Serial.println("    --- MUTE ---");
-    BD37033_setMute(true);
-    Serial.println("    Mute: ON");
-    delay(500);
-    BD37033_setMute(false);
-    Serial.println("    Mute: OFF");
-    
-    delay(500);
-
-    // ---- ADVANCED SWITCH ----
-    Serial.println("    --- ADVANCED SWITCH ---");
-    BD37033_setAdvancedSwitch(0b11100010);
-    Serial.println("    Advanced Switch: 0b11100010 (RF protection)");
-    
-    delay(500);
-
-    // ---- READ FUNCTIONS ----
-    Serial.println("    --- READ FUNCTIONS (DIAGNOSTICS) ---");
-    int8_t vol = BD37033_getVolume();
-    uint8_t input = BD37033_getInput();
-    bool mute = BD37033_getMute();
-    int8_t bass = BD37033_getBass();
-    int8_t mid = BD37033_getMiddle();
-    int8_t treb = BD37033_getTreble();
-    bool loud = BD37033_getLoudness();
-    uint8_t gain = BD37033_getInputGain();
-    bool type = BD37033_getInputType();
-    
-    Serial.printf("    Volume: %d dB\n", vol);
-    Serial.printf("    Input: %c\n", 'A' + input);
-    Serial.printf("    Mute: %s\n", mute ? "ON" : "OFF");
-    Serial.printf("    Bass: %d dB\n", bass);
-    Serial.printf("    Middle: %d dB\n", mid);
-    Serial.printf("    Treble: %d dB\n", treb);
-    Serial.printf("    Loudness: %s\n", loud ? "ON" : "OFF");
-    Serial.printf("    Input Gain: %d dB\n", gain);
-    Serial.printf("    Input Type: %s\n", type ? "Differential" : "Single-ended");
-    
-    // ---- PRINT REGISTERS ----
-    Serial.println("    --- PRINTING ALL REGISTERS ---");
-    BD37033_printRegisters();
-
-    // ---- FINAL STATE ----
-    Serial.println("    --- FINAL STATE (all settings applied) ---");
-    BD37033_setVolume(30);
-    BD37033_setInput(BD37033_INPUT_A);
-    BD37033_setBass(0);
-    BD37033_setMiddle(0);
-    BD37033_setTreble(0);
-    BD37033_setBalance(0);
-    BD37033_setLoudness(false);
-    BD37033_setMute(false);
-    Serial.println("    All settings reset to neutral");
-}
-
-// ==================================================
-// DEMO CYCLE
-// ==================================================
-
-void runDemoCycle() {
-    switch (currentStep) {
-        case 0:
-            Serial.println("\n--- Demo: Volume sweep ---");
-            for (int v = 5; v <= 50; v += 5) {
-                BD37033_setVolume(v);
-                Serial.printf("Volume: %d\n", v);
-                delay(300);
-            }
-            for (int v = 45; v >= 5; v -= 5) {
-                BD37033_setVolume(v);
-                Serial.printf("Volume: %d\n", v);
-                delay(300);
-            }
-            BD37033_setVolume(30);
-            break;
-            
-        case 1:
-            Serial.println("\n--- Demo: Bass sweep ---");
-            for (int b = -15; b <= 15; b += 3) {
-                BD37033_setBass(b);
-                Serial.printf("Bass: %d dB\n", b);
-                delay(300);
-            }
-            BD37033_setBass(0);
-            break;
-            
-        case 2:
-            Serial.println("\n--- Demo: Treble sweep ---");
-            for (int t = -15; t <= 15; t += 3) {
-                BD37033_setTreble(t);
-                Serial.printf("Treble: %d dB\n", t);
-                delay(300);
-            }
-            BD37033_setTreble(0);
-            break;
-            
-        case 3:
-            Serial.println("\n--- Demo: Balance sweep ---");
-            for (int b = -10; b <= 10; b += 2) {
-                BD37033_setBalance(b);
-                Serial.printf("Balance: %d\n", b);
-                delay(300);
-            }
-            BD37033_setBalance(0);
-            break;
-            
-        case 4:
-            Serial.println("\n--- Demo: Input cycling ---");
-            for (int i = 0; i < 5; i++) {
-                BD37033_setInput(i);
-                Serial.printf("Input: %c\n", 'A' + i);
-                delay(500);
-            }
-            BD37033_setInput(BD37033_INPUT_A);
-            break;
-            
-        case 5:
-            Serial.println("\n--- Demo: Loudness toggle ---");
-            BD37033_setLoudness(true);
-            Serial.println("Loudness: ON");
-            delay(1000);
-            BD37033_setLoudness(false);
-            Serial.println("Loudness: OFF");
-            break;
-            
-        case 6:
-            Serial.println("\n--- Demo: Mute toggle ---");
-            BD37033_setMute(true);
-            Serial.println("Mute: ON");
-            delay(1000);
-            BD37033_setMute(false);
-            Serial.println("Mute: OFF");
-            break;
-            
-        case 7:
-            Serial.println("\n--- Demo: Subwoofer LPF cycling ---");
-            int lpfValues[] = {BD37033_SUB_OFF, BD37033_SUB_55HZ, BD37033_SUB_85HZ, BD37033_SUB_120HZ, BD37033_SUB_160HZ};
-            const char* lpfNames[] = {"OFF", "55 Hz", "85 Hz", "120 Hz", "160 Hz"};
-            for (int i = 0; i < 5; i++) {
-                BD37033_setSubLPF(lpfValues[i]);
-                Serial.printf("Sub LPF: %s\n", lpfNames[i]);
-                delay(500);
-            }
-            BD37033_setSubLPF(BD37033_SUB_OFF);
-            break;
-            
+    switch (demoStep) {
+        case 0:  demoVolumeSweep(); break;
+        case 1:  demoBassSweep(); break;
+        case 2:  demoMiddleSweep(); break;
+        case 3:  demoTrebleSweep(); break;
+        case 4:  demoBalanceSweep(); break;
+        case 5:  demoInputSelect(); break;
+        case 6:  demoFader(); break;
+        case 7:  demoSubwoofer(); break;
+        case 8:  demoInputGain(); break;
+        case 9:  demoAdvancedTone(); break;
+        case 10: demoInputType(); break;
         default:
-            break;
+            demoStep = 0;
+            Serial.println("\n=== 🔄 DEMO RESTARTED ===\n");
+            delay(1000);
+            return;
     }
+    delay(1500);
+}
+
+// ==================================================
+// HELPERS
+// ==================================================
+
+void restoreVolume() {
+    BD37033_setVolume(DEFAULT_VOLUME_DB);
+    Serial.printf("    🔈 Volume restored to %d dB\n", DEFAULT_VOLUME_DB);
+}
+
+// ==================================================
+// DEMO FUNCTIONS
+// ==================================================
+
+void demoVolumeSweep() {
+    Serial.println("\n--- 🔊 VOLUME SWEEP (dB) ---");
+    Serial.println("    Volume will go from quiet to loud and back");
+    Serial.println("    Range: -79 dB (quiet) to 0 dB (loudest)");
     
-    currentStep++;
-    if (currentStep > 7) {
-        currentStep = 0;
-        Serial.println("\n=== Demo cycle restarted ===");
+    for (int v = -79; v <= 0; v += 5) {
+        BD37033_setVolume(v);
+        Serial.printf("    Volume: %d dB\n", v);
+        delay(400);
     }
+    for (int v = -5; v >= -79; v -= 5) {
+        BD37033_setVolume(v);
+        Serial.printf("    Volume: %d dB\n", v);
+        delay(400);
+    }
+    restoreVolume();
+    demoStep++;
+}
+
+void demoBassSweep() {
+    Serial.println("\n--- 🎵 BASS SWEEP (dB) ---");
+    Serial.println("    Listen to the low frequencies change");
+    Serial.println("    Range: -15 dB (cut) to +15 dB (boost)");
+    
+    for (int b = -15; b <= 15; b += 5) {
+        BD37033_setBass(b);
+        Serial.printf("    Bass: %d dB\n", b);
+        delay(600);
+    }
+    for (int b = 10; b >= -15; b -= 5) {
+        BD37033_setBass(b);
+        Serial.printf("    Bass: %d dB\n", b);
+        delay(600);
+    }
+    BD37033_setBass(0);
+    Serial.println("    ✅ Bass back to 0 dB");
+    restoreVolume();
+    demoStep++;
+}
+
+void demoMiddleSweep() {
+    Serial.println("\n--- 🎵 MIDDLE SWEEP (dB) ---");
+    Serial.println("    Listen to the mid frequencies change");
+    Serial.println("    Range: -15 dB (cut) to +15 dB (boost)");
+    
+    for (int m = -15; m <= 15; m += 5) {
+        BD37033_setMiddle(m);
+        Serial.printf("    Middle: %d dB\n", m);
+        delay(600);
+    }
+    for (int m = 10; m >= -15; m -= 5) {
+        BD37033_setMiddle(m);
+        Serial.printf("    Middle: %d dB\n", m);
+        delay(600);
+    }
+    BD37033_setMiddle(0);
+    Serial.println("    ✅ Middle back to 0 dB");
+    restoreVolume();
+    demoStep++;
+}
+
+void demoTrebleSweep() {
+    Serial.println("\n--- 🎵 TREBLE SWEEP (dB) ---");
+    Serial.println("    Listen to the high frequencies change");
+    Serial.println("    Range: -15 dB (cut) to +15 dB (boost)");
+    
+    for (int t = -15; t <= 15; t += 5) {
+        BD37033_setTreble(t);
+        Serial.printf("    Treble: %d dB\n", t);
+        delay(600);
+    }
+    for (int t = 10; t >= -15; t -= 5) {
+        BD37033_setTreble(t);
+        Serial.printf("    Treble: %d dB\n", t);
+        delay(600);
+    }
+    BD37033_setTreble(0);
+    Serial.println("    ✅ Treble back to 0 dB");
+    restoreVolume();
+    demoStep++;
+}
+
+void demoBalanceSweep() {
+    Serial.println("\n--- 🔊 BALANCE SWEEP ---");
+    Serial.println("    Listen to the sound move left and right");
+    Serial.println("    Range: -10 (left) to +10 (right)");
+    
+    for (int b = -10; b <= 10; b += 2) {
+        BD37033_setBalance(b);
+        Serial.printf("    Balance: %d\n", b);
+        delay(500);
+    }
+    for (int b = 8; b >= -10; b -= 2) {
+        BD37033_setBalance(b);
+        Serial.printf("    Balance: %d\n", b);
+        delay(500);
+    }
+    BD37033_setBalance(0);
+    Serial.println("    ✅ Balance back to center (0)");
+    restoreVolume();
+    demoStep++;
+}
+
+void demoInputSelect() {
+    Serial.println("\n--- 🔄 INPUT SELECTION ---");
+    Serial.println("    Switching between inputs A, B, C, D, E");
+    
+    const char* inputs[] = {"A", "B", "C", "D", "E"};
+    for (int i = 0; i < 5; i++) {
+        BD37033_setInput(i);
+        Serial.printf("    Input: %s\n", inputs[i]);
+        delay(800);
+    }
+    BD37033_setInput(BD37033_INPUT_A);
+    Serial.println("    ✅ Back to Input A");
+    restoreVolume();
+    demoStep++;
+}
+
+void demoFader() {
+    Serial.println("\n--- 🔊 FADER SWEEP ---");
+    Serial.println("    Front/Rear balance (if connected)");
+    Serial.println("    Range: -100 (rear) to +100 (front)");
+    
+    for (int f = -100; f <= 100; f += 25) {
+        BD37033_setFader(f);
+        Serial.printf("    Fader: %d\n", f);
+        delay(400);
+    }
+    BD37033_setFader(0);
+    Serial.println("    ✅ Fader back to center (0)");
+    
+    // ★★★ ПРИНУДИТЕЛЬНОЕ ВОССТАНОВЛЕНИЕ ЗВУКА ★★★
+    BD37033_setChannelVolume(0, 0);
+    BD37033_setChannelVolume(1, 0);
+    BD37033_setChannelVolume(2, 0);
+    BD37033_setChannelVolume(3, 0);
+    BD37033_setChannelVolume(4, 0);
+    BD37033_setBalance(0);
+    BD37033_setVolume(DEFAULT_VOLUME_DB);
+    BD37033_setMute(false);
+    Serial.printf("    🔈 Sound restored: Volume %d dB, all channels 0 dB\n", DEFAULT_VOLUME_DB);
+    demoStep++;
+}
+
+void demoSubwoofer() {
+    Serial.println("\n--- 🔊 SUBWOOFER LPF ---");
+    Serial.println("    Changing subwoofer low-pass filter");
+    
+    struct {
+        int val;
+        const char* name;
+    } lpf[] = {
+        {BD37033_SUB_OFF, "OFF"},
+        {BD37033_SUB_55HZ, "55 Hz"},
+        {BD37033_SUB_85HZ, "85 Hz"},
+        {BD37033_SUB_120HZ, "120 Hz"},
+        {BD37033_SUB_160HZ, "160 Hz"}
+    };
+    
+    for (int i = 0; i < 5; i++) {
+        BD37033_setSubLPF(lpf[i].val);
+        Serial.printf("    Sub LPF: %s\n", lpf[i].name);
+        delay(600);
+    }
+    BD37033_setSubLPF(BD37033_SUB_OFF);
+    Serial.println("    ✅ Sub LPF back to OFF");
+    restoreVolume();
+    demoStep++;
+}
+
+void demoInputGain() {
+    Serial.println("\n--- 🔊 INPUT GAIN (dB) ---");
+    Serial.println("    Changes input signal level");
+    Serial.println("    Range: 0 dB to +16 dB (can cause distortion at high values)");
+    
+    for (int g = 0; g <= 16; g += 4) {
+        BD37033_setInputGain(g);
+        Serial.printf("    Input Gain: %d dB\n", g);
+        delay(500);
+    }
+    BD37033_setInputGain(0);
+    Serial.println("    ✅ Input Gain back to 0 dB");
+    restoreVolume();
+    demoStep++;
+}
+
+void demoAdvancedTone() {
+    Serial.println("\n--- 🎵 ADVANCED TONE SETTINGS ---");
+    Serial.println("    Changing Bass frequency and Q");
+    
+    BD37033_setBass(5);
+    
+    Serial.println("    Bass +5 dB, F0: 60 Hz (deep)");
+    BD37033_setBassF0(BD37033_BASS_60HZ);
+    delay(800);
+    
+    Serial.println("    Bass +5 dB, F0: 120 Hz (tight)");
+    BD37033_setBassF0(BD37033_BASS_120HZ);
+    delay(800);
+    
+    Serial.println("    Bass +5 dB, Q: 1.0 (wide)");
+    BD37033_setBassQ(BD37033_BASS_Q_1_0);
+    delay(800);
+    
+    Serial.println("    Bass +5 dB, Q: 2.0 (narrow)");
+    BD37033_setBassQ(BD37033_BASS_Q_2_0);
+    delay(800);
+    
+    BD37033_setBass(0);
+    BD37033_setBassF0(BD37033_BASS_100HZ);
+    BD37033_setBassQ(BD37033_BASS_Q_1_5);
+    Serial.println("    ✅ Bass back to 0 dB, F0: 100 Hz, Q: 1.5");
+    restoreVolume();
+    demoStep++;
+}
+
+void demoInputType() {
+    Serial.println("\n--- 🔌 INPUT TYPE ---");
+    Serial.println("    Switching between Single-ended and Differential");
+    Serial.println("    (Effect depends on your source)");
+    
+    BD37033_setInputType(false, BD37033_INPUT_A);
+    Serial.println("    Input A: Single-ended");
+    delay(1000);
+    
+    BD37033_setInputType(true, BD37033_INPUT_A);
+    Serial.println("    Input A: Differential");
+    delay(1000);
+    
+    BD37033_setInputType(false, BD37033_INPUT_A);
+    Serial.println("    ✅ Back to Single-ended");
+    restoreVolume();
+    
+    Serial.println("\n=== ✅ DEMO COMPLETE ===");
+    Serial.println("    Cycle will restart in 3 seconds...");
+    demoRunning = false;
+    delay(3000);
+    demoRunning = true;
+    demoStep = 0;
 }
